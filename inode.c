@@ -327,7 +327,7 @@ struct inode *ext2_iget(struct super_block *sb, unsigned long ino)
 	inode_set_atime(inode, (signed)le32_to_cpu(raw_inode->i_atime), 0);
 	inode_set_ctime(inode, (signed)le32_to_cpu(raw_inode->i_ctime), 0);
 	inode_set_mtime(inode, (signed)le32_to_cpu(raw_inode->i_mtime), 0);
-	ei->i_dtime = le32_to_cpu(raw_inode->i_dtime);
+	ei = EXT2_I(inode);
 	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
 	inode->i_size = le32_to_cpu(raw_inode->i_size);
 	if (i_size_read(inode) < 0) {
@@ -338,9 +338,13 @@ struct inode *ext2_iget(struct super_block *sb, unsigned long ino)
 	}
 	//> Setup the {inode,file}_operations structures depending on the type.
 	if (S_ISREG(inode->i_mode)) {
-		/* ? */
+		inode->i_op = &ext2_file_inode_operations;
+		inode->i_fop = &ext2_file_operations;
+		inode->i_mapping->a_ops = &ext2_aops;
 	} else if (S_ISDIR(inode->i_mode)) {
-		/* ? */
+		inode->i_op = &ext2_dir_inode_operations;
+		inode->i_fop = &ext2_dir_operations;
+		inode->i_mapping->a_ops = &ext2_aops;
 	} else if (S_ISLNK(inode->i_mode)) {
 		if (ext2_inode_is_fast_symlink(inode)) {
 			inode->i_op = &simple_symlink_inode_operations;
@@ -364,7 +368,6 @@ struct inode *ext2_iget(struct super_block *sb, unsigned long ino)
 	/*
 	 * Fill the necessary fields of the ext2_inode_info structure.
 	 */
-	ei = EXT2_I(inode);
 	ei->i_dtime = le32_to_cpu(raw_inode->i_dtime);
 	ei->i_flags = le32_to_cpu(raw_inode->i_flags);
 	ext2_set_inode_flags(inode);
