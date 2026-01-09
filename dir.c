@@ -264,9 +264,39 @@ ext2_dirent *ext2_find_entry(struct inode *dir, const struct qstr *child,
 	/* Scan all the pages of the directory to find the requested name. */
 	for (i=0; i < npages; i++) {
 		/* ? */
-	}
+		kaddr = ext2_get_folio(dir, i, 0, foliop);
+		if (IS_ERR(kaddr)) {
+            return ERR_CAST(kaddr);
+        }
+
+        de = (ext2_dirent *)kaddr; //directory entry
+
+        char *last_byte =  kaddr + ext2_last_byte(dir, i); 	// last safe byte of ith page
+
+        // Iteration through entries in this page
+        while ((char *)de < last_byte) {
+            
+            //if file system is corrupted --> error
+            if (de->rec_len == 0) {
+                folio_release_kmap(*foliop, kaddr);
+                return ERR_PTR(-EIO); // IO Error
+            }
+
+            // check if we found the entry
+            if (ext2_match(namelen, name, de) == 1) {
+                return de;
+            }
+
+            de = ext2_next_entry(de);
+        }
+
+        folio_release_kmap(*foliop, kaddr);
+    }
+
 	return ERR_PTR(-ENOENT);
 }
+
+
 
 ext2_dirent *ext2_dotdot(struct inode *dir, struct folio **foliop)
 {
