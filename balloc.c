@@ -318,9 +318,42 @@ static int ext2_allocate_in_bg(struct super_block *sb, int group,
 	ext2_fsblk_t group_last_block = ext2_group_last_block_no(sb, group);
 	ext2_grpblk_t nblocks = group_last_block - group_first_block + 1;
 	ext2_grpblk_t first_free_bit;
-	unsigned long num;
+	unsigned long num = 0;
 
+	unsigned long start = 0;
 	/* ? */
+
+	// in case of race conditions and error in allocating the block
+	while(1){
+		// We find the first 0 bit aka first free block
+		first_free_bit = find_next_zero_bit_le(bitmap_bh->b_data, nblocks, start);
+
+    	if (first_free_bit >= nblocks) {
+       		return -1;
+    	}
+	
+		if (ext2_set_bit_atomic(sb_bgl_lock(sb, group), first_free_bit, bitmap_bh->b_data) == 0){
+			num++;
+			break;
+		} 
+		start = first_free_bit + 1;
+	}
+
+    // We allocate till we exceed *count or go paste the block group or find a used block
+    while ( num < *count && (first_free_bit + num < nblocks) ) {
+        ext2_grpblk_t next_bit = first_free_bit + num;
+
+        // If it returns 1 th block is used so they are not consequtive and we stop
+        if (ext2_set_bit_atomic(sb_bgl_lock(sb, group), next_bit, bitmap_bh->b_data)) {
+            break;
+        }
+        num++;
+    }
+
+
+	*count = num; // shows the number of blocks allocated
+    return first_free_bit; // returns the index of the first block
+	
 	return -1;
 }
 
