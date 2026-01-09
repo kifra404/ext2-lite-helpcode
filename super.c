@@ -769,7 +769,7 @@ static int __init init_ext2_fs(void)
 	/* ? */
     int fser = register_filesystem(&ext2_fs_type);
 	if(fser!=0) {
-		err=destroy_inodecache();
+		destroy_inodecache();
 		return fser;
 	}
 
